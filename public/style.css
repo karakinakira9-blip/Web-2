@@ -1,0 +1,269 @@
+:root {
+  --pink: #ffc0d9;
+  --hot-pink: #ff1493;
+  --cream: rgb(243, 239, 202);
+  --ink: #111;
+  --danger: #c62828;
+  --success: #1a7f37;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  color: var(--ink);
+  background: var(--pink);
+  margin: 0;
+  padding: 20px;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+button,
+input {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+#header {
+  font-family: Arial, Helvetica, sans-serif;
+  color: var(--ink);
+  font-size: 16px;
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+
+#header h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.header_info {
+  margin-top: 6px;
+}
+
+.header_info td {
+  padding: 2px 8px 2px 0;
+  font-size: 14px;
+}
+
+.header_info .label {
+  font-weight: bold;
+}
+
+.page {
+  width: 100%;
+  max-width: 1050px;
+  margin: 0 auto;
+  background: transparent;
+}
+
+.page > tbody > tr > td {
+  vertical-align: top;
+  padding: 16px;
+}
+
+#canvas_cell {
+  width: 500px;
+  background: var(--hot-pink);
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+}
+
+#form_cell {
+  background: #fff;
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+}
+
+#result_cell {
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+}
+
+#result_cell h2 {
+  margin-top: 0;
+}
+
+canvas#plane {
+  width: 100%;
+  height: auto;
+  display: block;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255,255,255,.8) 0 4px, transparent 5px),
+    radial-gradient(circle at 78% 64%, rgba(255,255,255,.65) 0 5px, transparent 6px),
+    linear-gradient(145deg, #fff6fb, #ffd4e5);
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+}
+
+.hint {
+  color: var(--ink);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.form_table {
+  width: 100%;
+}
+
+.form_table td {
+  padding: 8px 6px;
+  vertical-align: top;
+}
+
+.form_table input[type="text"] {
+  padding: 8px 10px;
+  background: var(--pink);
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  font-size: 14px;
+  width: 140px;
+}
+
+.form_table input[type="text"]:focus {
+  outline: none;
+  border-color: var(--hot-pink);
+  box-shadow: 0 0 0 2px rgba(255, 20, 147, .18);
+}
+
+.form_table input.invalid {
+  border-color: var(--danger);
+  background: #fff;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 12px;
+  min-height: 18px;
+  max-width: 240px;
+}
+
+.toggle_group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.toggle_group > button {
+  min-width: 36px;
+  padding: 6px 8px;
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  background: var(--pink);
+  font-size: 13px;
+  transition: background .15s, transform .15s;
+}
+
+.toggle_group > button:hover {
+  border-color: var(--hot-pink);
+  transform: translateY(-1px);
+}
+
+.toggle_group > button.active {
+  background: var(--hot-pink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.submit_cell {
+  padding-top: 12px !important;
+}
+
+#submit_btn,
+#clear_btn {
+  padding: 10px 14px;
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  color: var(--ink);
+  font-weight: bold;
+}
+
+#submit_btn {
+  background: var(--hot-pink);
+}
+
+#clear_btn {
+  margin-left: 6px;
+  background: var(--pink);
+}
+
+#submit_btn:disabled,
+#clear_btn:disabled {
+  cursor: wait;
+  opacity: .6;
+}
+
+#request_status {
+  min-height: 24px;
+  margin: 8px 6px 0;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+#request_status.error {
+  color: var(--danger);
+}
+
+#request_status.success {
+  color: var(--success);
+}
+
+.table_scroll {
+  overflow-x: auto;
+}
+
+#result_table {
+  width: 100%;
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+}
+
+#result_table th,
+#result_table td {
+  border: 1px solid var(--ink);
+  padding: 8px 10px;
+  font-size: 13px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+#result_table th {
+  background: var(--hot-pink);
+  border-bottom: 3px solid var(--ink);
+}
+
+#result_table tbody tr:nth-child(even) {
+  background: #fff;
+}
+
+#result_table tbody tr:nth-child(odd) {
+  background: rgba(201, 201, 201, .62);
+}
+
+#result_table td.hit {
+  color: var(--success);
+  font-weight: bold;
+}
+
+#result_table td.miss {
+  color: var(--danger);
+  font-weight: bold;
+}
+
+@media (max-width: 850px) {
+  body { padding: 8px; }
+  .page, .page > tbody, .page > tbody > tr { display: block; }
+  .page > tbody > tr > td { display: block; width: 100%; margin-bottom: 10px; }
+  #canvas_cell { width: 100%; }
+}

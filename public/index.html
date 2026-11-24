@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Проверка попадания точки в область с помощью Java FastCGI">
+  <meta name="author" content="Карякина Кира Константиновна">
+  <title>Лабораторная работа №2</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <table class="page" id="page_table">
+    <tbody>
+      <tr>
+        <td colspan="2" id="header">
+          <h1>Лабораторная работа №2</h1>
+          <table class="header_info">
+            <tbody>
+              <tr><td class="label">ФИО:</td><td>Карякина Кира Константиновна</td></tr>
+              <tr><td class="label">Группа:</td><td>Р3207</td></tr>
+              <tr><td class="label">Вариант:</td><td>751429</td></tr>
+            </tbody>
+          </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td id="canvas_cell">
+          <canvas id="plane" width="500" height="500"></canvas>
+          <p class="hint">Зелёная точка попадает в область, красная не попадает</p>
+        </td>
+
+        <td id="form_cell">
+          <form id="point_form" method="post" action="/fcgi-bin/lab2.jar" novalidate>
+            <table class="form_table">
+              <tbody>
+                <tr>
+                  <td>X:</td>
+                  <td>
+                    <div class="toggle_group" id="x_group" role="group" aria-label="Выбор X"></div>
+                    <input type="hidden" id="x_input" name="x">
+                    <div class="error" id="x_error"></div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><label for="y_input">Y&nbsp;(&minus;3&nbsp;...&nbsp;3):</label></td>
+                  <td>
+                    <input type="text" id="y_input" name="y" placeholder="например, 1.5" autocomplete="off">
+                    <div class="error" id="y_error"></div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><label for="r_input">R&nbsp;(1&nbsp;...&nbsp;4):</label></td>
+                  <td>
+                    <input type="text" id="r_input" name="r" placeholder="например, 2" autocomplete="off">
+                    <div class="error" id="r_error"></div>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="2" class="submit_cell">
+                    <button type="submit" id="submit_btn">Проверить попадание</button>
+                    <button type="button" id="clear_btn">Очистить историю</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </form>
+          <p id="request_status" role="status"></p>
+        </td>
+      </tr>
+
+      <tr>
+        <td colspan="2" id="result_cell">
+          <h2>Результаты проверки</h2>
+          <div class="table_scroll">
+            <table id="result_table">
+              <thead>
+                <tr>
+                  <th>№</th>
+                  <th>X</th>
+                  <th>Y</th>
+                  <th>R</th>
+                  <th>Результат</th>
+                  <th>Дата и время</th>
+                  <th>Время работы</th>
+                </tr>
+              </thead>
+              <tbody id="result_body"></tbody>
+            </table>
+          </div>
+          <p class="hint" id="empty_hint">Пока нет результатов</p>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <script src="script.js"></script>
+</body>
+</html>
