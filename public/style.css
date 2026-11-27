@@ -99,10 +99,7 @@ canvas#plane {
   width: 100%;
   height: auto;
   display: block;
-  background:
-    radial-gradient(circle at 18% 18%, rgba(255,255,255,.8) 0 4px, transparent 5px),
-    radial-gradient(circle at 78% 64%, rgba(255,255,255,.65) 0 5px, transparent 6px),
-    linear-gradient(145deg, #fff6fb, #ffd4e5);
+  background: linear-gradient(145deg, #fff6fb, #ffd4e5);
   border: 3px solid var(--ink);
   border-radius: 8px;
 }

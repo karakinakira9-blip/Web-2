@@ -1,34 +1,40 @@
 package app;
 
-public final class AreaChecker {
-    private static final double EPSILON = 1e-9;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 
+public final class AreaChecker {
     private AreaChecker() {
     }
 
-    public static boolean isHit(double x, double y, double r) {
-        return inRectangle(x, y, r)
-                || inTriangle(x, y, r)
-                || inQuarterCircle(x, y, r);
+    public static boolean isHit(int x, BigDecimal y, BigDecimal r) {
+        int scale = Math.max(0, Math.max(y.scale(), r.scale()));
+        BigInteger xs = BigInteger.valueOf(x).multiply(BigInteger.TEN.pow(scale));
+        BigInteger ys = y.setScale(scale).unscaledValue();
+        BigInteger rs = r.setScale(scale).unscaledValue();
+
+        return inRectangle(xs, ys, rs)
+                || inTriangle(xs, ys, rs)
+                || inQuarterCircle(xs, ys, rs);
     }
 
-    private static boolean inRectangle(double x, double y, double r) {
-        return x >= -r - EPSILON
-                && x <= EPSILON
-                && y >= -r / 2.0 - EPSILON
-                && y <= EPSILON;
+    private static boolean inRectangle(BigInteger x, BigInteger y, BigInteger r) {
+        return x.compareTo(r.negate()) >= 0
+                && x.signum() <= 0
+                && y.shiftLeft(1).compareTo(r.negate()) >= 0
+                && y.signum() <= 0;
     }
 
-    private static boolean inTriangle(double x, double y, double r) {
-        return x >= -r / 2.0 - EPSILON
-                && x <= EPSILON
-                && y >= -EPSILON
-                && y <= x + r / 2.0 + EPSILON;
+    private static boolean inTriangle(BigInteger x, BigInteger y, BigInteger r) {
+        // 2(y - x) <= R при x <= 0 и y >= 0.
+        return x.signum() <= 0
+                && y.signum() >= 0
+                && y.subtract(x).shiftLeft(1).compareTo(r) <= 0;
     }
 
-    private static boolean inQuarterCircle(double x, double y, double r) {
-        return x >= -EPSILON
-                && y >= -EPSILON
-                && x * x + y * y <= r * r + EPSILON;
+    private static boolean inQuarterCircle(BigInteger x, BigInteger y, BigInteger r) {
+        return x.signum() >= 0
+                && y.signum() >= 0
+                && x.multiply(x).add(y.multiply(y)).compareTo(r.multiply(r)) <= 0;
     }
 }

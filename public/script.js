@@ -9,7 +9,6 @@ const R_MAX = 4;
 
 const form = document.getElementById("point_form");
 const xGroup = document.getElementById("x_group");
-const xInput = document.getElementById("x_input");
 const yInput = document.getElementById("y_input");
 const rInput = document.getElementById("r_input");
 const xError = document.getElementById("x_error");
@@ -23,14 +22,30 @@ const emptyHint = document.getElementById("empty_hint");
 const canvas = document.getElementById("plane");
 const ctx = canvas.getContext("2d");
 
-let selectedX = null;
+const selectedX = new Set();
 let records = [];
 
 function parseDecimal(raw) {
   const normalized = raw.trim().replace(",", ".");
   if (!/^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) return null;
-  const value = Number(normalized);
-  return Number.isFinite(value) ? value : null;
+
+  const [whole, fraction = ""] = normalized.split(".");
+  const significantFraction = fraction.replace(/0+$/, "");
+  const digits = whole.replace("-", "") + significantFraction;
+  const magnitude = BigInt(digits || "0");
+
+  return {
+    raw,
+    normalized,
+    coefficient: normalized.startsWith("-") ? -magnitude : magnitude,
+    scale: significantFraction.length
+  };
+}
+
+function inRange(value, min, max) {
+  const factor = 10n ** BigInt(value.scale);
+  return value.coefficient >= BigInt(min) * factor
+    && value.coefficient <= BigInt(max) * factor;
 }
 
 X_VALUES.forEach((value) => {
@@ -38,24 +53,28 @@ X_VALUES.forEach((value) => {
   button.type = "button";
   button.textContent = String(value);
   button.dataset.value = String(value);
+  button.setAttribute("aria-pressed", "false");
   button.addEventListener("click", () => {
-    selectedX = value;
-    xInput.value = String(value);
-    xGroup.querySelectorAll("button").forEach((item) => {
-      item.classList.toggle("active", item === button);
-    });
+    if (selectedX.has(value)) {
+      selectedX.delete(value);
+    } else {
+      selectedX.add(value);
+    }
+    const isSelected = selectedX.has(value);
+    button.classList.toggle("active", isSelected);
+    button.setAttribute("aria-pressed", String(isSelected));
     xError.textContent = "";
   });
   xGroup.appendChild(button);
 });
 
 function validateX() {
-  if (selectedX === null || !X_VALUES.includes(selectedX)) {
-    xError.textContent = "Выберите одно значение X";
+  if (selectedX.size === 0) {
+    xError.textContent = "Выберите хотя бы одно значение X";
     return null;
   }
   xError.textContent = "";
-  return selectedX;
+  return X_VALUES.filter((value) => selectedX.has(value));
 }
 
 function validateTextInput(input, error, min, max, name) {
@@ -65,7 +84,7 @@ function validateTextInput(input, error, min, max, name) {
     error.textContent = `${name} должен быть числом`;
     return null;
   }
-  if (value < min || value > max) {
+  if (!inRange(value, min, max)) {
     input.classList.add("invalid");
     error.textContent = `${name} должен быть в диапазоне [${min}; ${max}]`;
     return null;
@@ -92,14 +111,13 @@ yInput.addEventListener("input", () => {
 });
 
 rInput.addEventListener("input", () => {
-  const value = parseDecimal(rInput.value);
   if (rInput.value.trim() === "") {
     rInput.classList.remove("invalid");
     rError.textContent = "";
-  } else {
-    validateTextInput(rInput, rError, R_MIN, R_MAX, "R");
+    return;
   }
-  if (value !== null && value >= R_MIN && value <= R_MAX) drawScene(value, records);
+  const value = validateTextInput(rInput, rError, R_MIN, R_MAX, "R");
+  if (value !== null) drawScene(value, records);
 });
 
 function setBusy(busy) {
@@ -143,17 +161,17 @@ form.addEventListener("submit", async (event) => {
 
   const params = new URLSearchParams({
     action: "check",
-    x: String(values.x),
-    y: String(values.y),
-    r: String(values.r)
+    y: values.y.raw,
+    r: values.r.raw
   });
+  values.x.forEach((value) => params.append("x", String(value)));
 
   setBusy(true);
   setStatus("Отправка POST-запроса...");
   try {
     const data = await postForm(params);
     renderResults(data.history);
-    drawScene(values.r, records);
+    drawScene(currentR(), records);
     setStatus("Результат получен", "success");
   } catch (error) {
     setStatus(error.message, "error");
@@ -245,16 +263,25 @@ function toPy(y) {
 
 function currentR() {
   const value = parseDecimal(rInput.value);
-  return value !== null && value >= R_MIN && value <= R_MAX ? value : 2;
+  return value !== null && inRange(value, R_MIN, R_MAX) ? value : parseDecimal("2");
 }
 
-function drawScene(r, points) {
+function drawScene(radius, points) {
+  // Canvas принимает числа, а выбор точек по R остаётся точным.
+  const r = Number(radius.normalized);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawGrid();
   drawRegion(r);
   drawAxes(r);
-  points.filter((point) => Math.abs(Number(point.r) - r) < 1e-9)
-    .forEach((point) => drawPoint(Number(point.x), Number(point.y), point.hit));
+  points.filter((point) => {
+    const pointRadius = parseDecimal(String(point.r));
+    return pointRadius !== null
+      && pointRadius.coefficient === radius.coefficient
+      && pointRadius.scale === radius.scale;
+  }).forEach((point) => {
+    const y = Number(String(point.y).trim().replace(",", "."));
+    drawPoint(Number(point.x), y, point.hit);
+  });
 }
 
 function drawGrid() {

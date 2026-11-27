@@ -4,12 +4,14 @@ import com.fastcgi.FCGIInterface;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.math.BigDecimal;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -18,8 +20,10 @@ public final class Main {
     private static final List<Result> HISTORY = new ArrayList<Result>();
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
     private static final int MAX_BODY_BYTES = 8 * 1024;
-    private static final double EPSILON = 1e-9;
-    private static final int[] ALLOWED_X = {-5, -4, -3, -2, -1, 0, 1, 2, 3};
+    private static final BigDecimal Y_MIN = BigDecimal.valueOf(-3);
+    private static final BigDecimal Y_MAX = BigDecimal.valueOf(3);
+    private static final BigDecimal R_MIN = BigDecimal.ONE;
+    private static final BigDecimal R_MAX = BigDecimal.valueOf(4);
 
     private Main() {
     }
@@ -44,8 +48,8 @@ public final class Main {
                 return;
             }
 
-            Map<String, String> params = readForm(environment);
-            String action = params.getOrDefault("action", "check").trim();
+            Map<String, List<String>> params = readForm(environment);
+            String action = lastValue(params, "action", "check").trim();
 
             if ("history".equals(action)) {
                 sendJson(200, "OK", historyJson());
@@ -62,26 +66,24 @@ public final class Main {
                 throw new IllegalArgumentException("Неизвестное действие.");
             }
 
-            double x = requiredNumber(params, "x", "X");
-            double y = requiredNumber(params, "y", "Y");
-            double r = requiredNumber(params, "r", "R");
-            validateValues(x, y, r);
+            Map<Integer, String> selectedX = readSelectedX(params.get("x"));
+            String rawY = lastValue(params, "y", "");
+            String rawR = lastValue(params, "r", "");
+            BigDecimal y = requiredNumber(rawY, "Y");
+            BigDecimal r = requiredNumber(rawR, "R");
+            validateRange(y, Y_MIN, Y_MAX, "Y");
+            validateRange(r, R_MIN, R_MAX, "R");
 
-            boolean hit = AreaChecker.isHit(x, y, r);
-            long executionTimeNs = System.nanoTime() - startedAt;
-            Result result = new Result(
-                    x,
-                    y,
-                    r,
-                    hit,
-                    OffsetDateTime.now().format(TIME_FORMAT),
-                    executionTimeNs
-            );
-
-            synchronized (HISTORY) {
-                HISTORY.add(result);
+            List<Result> results = new ArrayList<>();
+            for (Map.Entry<Integer, String> x : selectedX.entrySet()) {
+                boolean hit = AreaChecker.isHit(x.getKey(), y, r);
+                results.add(new Result(x.getValue(), rawY, rawR, hit,
+                        OffsetDateTime.now().format(TIME_FORMAT), System.nanoTime() - startedAt));
             }
-            sendJson(200, "OK", successJson(result));
+            synchronized (HISTORY) {
+                HISTORY.addAll(results);
+            }
+            sendJson(200, "OK", successJson(results));
         } catch (RequestTooLargeException exception) {
             sendJson(413, "Payload Too Large", errorJson(exception.getMessage()));
         } catch (UnsupportedMediaTypeException exception) {
@@ -94,7 +96,7 @@ public final class Main {
         }
     }
 
-    private static Map<String, String> readForm(Properties environment) throws IOException {
+    private static Map<String, List<String>> readForm(Properties environment) throws IOException {
         String contentType = environment.getProperty("CONTENT_TYPE", "");
         if (!contentType.toLowerCase().startsWith("application/x-www-form-urlencoded")) {
             throw new UnsupportedMediaTypeException(
@@ -123,8 +125,8 @@ public final class Main {
         return parseUrlEncoded(new String(bodyBytes, StandardCharsets.UTF_8));
     }
 
-    private static Map<String, String> parseUrlEncoded(String body) {
-        Map<String, String> params = new HashMap<String, String>();
+    private static Map<String, List<String>> parseUrlEncoded(String body) {
+        Map<String, List<String>> params = new HashMap<String, List<String>>();
         if (body == null || body.isEmpty()) {
             return params;
         }
@@ -140,7 +142,7 @@ public final class Main {
             try {
                 String key = URLDecoder.decode(rawKey, StandardCharsets.UTF_8.name());
                 String value = URLDecoder.decode(rawValue, StandardCharsets.UTF_8.name());
-                params.put(key, value);
+                params.computeIfAbsent(key, ignored -> new ArrayList<>()).add(value);
             } catch (Exception exception) {
                 throw new IllegalArgumentException("Некорректно закодировано тело запроса.");
             }
@@ -148,53 +150,58 @@ public final class Main {
         return params;
     }
 
-    private static double requiredNumber(
-            Map<String, String> params,
-            String key,
-            String displayName
-    ) {
-        String raw = params.get(key);
-        if (raw == null || raw.trim().isEmpty()) {
-            throw new IllegalArgumentException("Параметр " + displayName + " обязателен.");
-        }
+    private static String lastValue(Map<String, List<String>> params, String key, String fallback) {
+        List<String> values = params.get(key);
+        return values == null ? fallback : values.get(values.size() - 1);
+    }
 
+    private static BigDecimal requiredNumber(String raw, String name) {
+        if (raw.trim().isEmpty()) {
+            throw new IllegalArgumentException("Параметр " + name + " обязателен.");
+        }
         try {
-            double value = Double.parseDouble(raw.trim().replace(',', '.'));
-            if (!Double.isFinite(value)) {
+            BigDecimal value = new BigDecimal(raw.trim().replace(',', '.'));
+            // Ограничиваем масштаб и для старых клиентов, отправляющих числа с экспонентой.
+            if (Math.abs((long) value.scale()) > MAX_BODY_BYTES) {
                 throw new NumberFormatException();
             }
             return value;
         } catch (NumberFormatException exception) {
-            throw new IllegalArgumentException("Параметр " + displayName + " должен быть числом.");
+            throw new IllegalArgumentException("Параметр " + name + " должен быть числом.");
         }
     }
 
-    private static void validateValues(double x, double y, double r) {
-        boolean allowedX = false;
-        for (int value : ALLOWED_X) {
-            if (Math.abs(x - value) <= EPSILON) {
-                allowedX = true;
-                break;
+    private static Map<Integer, String> readSelectedX(List<String> values) {
+        if (values == null) {
+            throw new IllegalArgumentException("Выберите хотя бы одно значение X.");
+        }
+
+        Map<Integer, String> selectedX = new LinkedHashMap<>();
+        for (String raw : values) {
+            BigDecimal value = requiredNumber(raw, "X");
+            try {
+                validateRange(value, BigDecimal.valueOf(-5), BigDecimal.valueOf(3), "X");
+                selectedX.putIfAbsent(value.intValueExact(), raw);
+            } catch (ArithmeticException | IllegalArgumentException exception) {
+                throw new IllegalArgumentException("X должен быть целым числом от -5 до 3.");
             }
         }
-        if (!allowedX) {
+        return selectedX;
+    }
+
+    private static void validateRange(BigDecimal value, BigDecimal min, BigDecimal max, String name) {
+        if (value.compareTo(min) < 0 || value.compareTo(max) > 0) {
             throw new IllegalArgumentException(
-                    "X должен быть одним из значений -5, -4, -3, -2, -1, 0, 1, 2, 3."
-            );
-        }
-        if (y < -3.0 || y > 3.0) {
-            throw new IllegalArgumentException("Y должен находиться в диапазоне [-3; 3].");
-        }
-        if (r < 1.0 || r > 4.0) {
-            throw new IllegalArgumentException("R должен находиться в диапазоне [1; 4].");
+                    "Параметр " + name + " должен быть в диапазоне [" + min + "; " + max + "].");
         }
     }
 
-    private static String successJson(Result current) {
+    private static String successJson(List<Result> results) {
         StringBuilder json = new StringBuilder();
-        json.append("{\"status\":\"ok\",\"point\":");
-        json.append(current.toJson());
-        json.append(",\"history\":[");
+        json.append("{\"status\":\"ok\",\"point\":").append(results.get(0).toJson());
+        json.append(",\"points\":[");
+        appendResults(json, results);
+        json.append("],\"history\":[");
         appendHistory(json);
         json.append("]}");
         return json.toString();
@@ -212,12 +219,16 @@ public final class Main {
 
     private static void appendHistory(StringBuilder json) {
         synchronized (HISTORY) {
-            for (int index = 0; index < HISTORY.size(); index++) {
-                if (index > 0) {
-                    json.append(',');
-                }
-                json.append(HISTORY.get(index).toJson());
+            appendResults(json, HISTORY);
+        }
+    }
+
+    private static void appendResults(StringBuilder json, List<Result> results) {
+        for (int index = 0; index < results.size(); index++) {
+            if (index > 0) {
+                json.append(',');
             }
+            json.append(results.get(index).toJson());
         }
     }
 
@@ -268,14 +279,14 @@ public final class Main {
     }
 
     private static final class Result {
-        private final double x;
-        private final double y;
-        private final double r;
+        private final String x;
+        private final String y;
+        private final String r;
         private final boolean hit;
         private final String serverTime;
         private final long executionTimeNs;
 
-        private Result(double x, double y, double r, boolean hit,
+        private Result(String x, String y, String r, boolean hit,
                        String serverTime, long executionTimeNs) {
             this.x = x;
             this.y = y;
@@ -286,9 +297,9 @@ public final class Main {
         }
 
         private String toJson() {
-            return "{\"x\":" + x
-                    + ",\"y\":" + y
-                    + ",\"r\":" + r
+            return "{\"x\":" + jsonString(x)
+                    + ",\"y\":" + jsonString(y)
+                    + ",\"r\":" + jsonString(r)
                     + ",\"hit\":" + hit
                     + ",\"serverTime\":" + jsonString(serverTime)
                     + ",\"executionTimeNs\":" + executionTimeNs
